@@ -19,6 +19,9 @@ project:
   source_files:
     - "tt_um_maze.v"
     - "hsync_generator.v"
+    - "gamepad_pmod.v"
+    - "maze.v"
+    - "prbs_generator.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
@@ -28,9 +31,9 @@ pinout:
   ui[1]: ""
   ui[2]: ""
   ui[3]: ""
-  ui[4]: ""
-  ui[5]: ""
-  ui[6]: ""
+  ui[4]: "pmod_gamepad_latch"
+  ui[5]: "pmod_gamepad_clk"
+  ui[6]: "pmod_gamepad_data"
   ui[7]: ""
 
   # Outputs
