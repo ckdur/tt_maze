@@ -1,8 +1,6 @@
 // copied from: https://github.com/mgwang37/PRBS/blob/master/Verilog/prbs_generator.v
 // Modified to just include one of the PRBS instead of having all
 
-`timescale 1ns / 1ps
-
 module prbs_generator #(
     parameter TYPE = 7 // PRBS29
 )(

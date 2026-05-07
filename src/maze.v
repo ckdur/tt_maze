@@ -49,6 +49,8 @@ module maze(
     reg rr; always @(posedge clk) rr <= r; wire pr; assign pr = !rr && r;
     reg ris_present; always @(posedge clk) ris_present <= is_present; wire pis_present; assign pis_present = !ris_present && is_present;
 
+    wire [3:0] _not_used_ = {pl, pr, pis_present, pselect};
+
 
     reg [4:0] state;
     reg [9:0] start_maze_x;

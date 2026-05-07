@@ -51,7 +51,7 @@ module tt_um_maze (
     wire gamepad_r;
 
     // Copied from tt08-cfib-demo
-    localparam CLOCK_FREQUENCY = 50000000;
+    /*localparam CLOCK_FREQUENCY = 50000000;
     reg [4:0]  sys_presc;
     always @(posedge clk or negedge rst_n) begin
         if (~rst_n) begin
@@ -59,7 +59,7 @@ module tt_um_maze (
         end else begin
             sys_presc    <= sys_presc + 5'b1;
         end
-    end
+    end*/
     wire vga_ena = 1'b1;//sys_presc[0];
 
     hvsync_generator hvsync_gen(

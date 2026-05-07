@@ -45,6 +45,7 @@
  * Outputs:
  *   - `data_reg`: Captured parallel data after shifting is complete.
  */
+
 module gamepad_pmod_driver #(
     parameter BIT_WIDTH = 24
 ) (
@@ -65,7 +66,7 @@ module gamepad_pmod_driver #(
   reg [1:0] pmod_clk_sync;
   reg [1:0] pmod_latch_sync;
 
-  always @(posedge clk) begin
+  always @(posedge clk, negedge rst_n) begin
     if (~rst_n) begin
       pmod_data_sync  <= 2'b0;
       pmod_clk_sync   <= 2'b0;
@@ -77,7 +78,7 @@ module gamepad_pmod_driver #(
     end
   end
 
-  always @(posedge clk) begin
+  always @(posedge clk, negedge rst_n) begin
     if (~rst_n) begin
       /* Initialize data and shift registers to all 1s so they're detected as "not present".
        * This accounts for cases where we have:
