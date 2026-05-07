@@ -30,7 +30,8 @@ module maze(
     localparam MIN_MAZE_Y = 5;
     localparam MAX_MAZE_X = 14;
     localparam MAX_MAZE_Y = 14;
-
+    localparam BITS_MAX_MAZE = $clog2(MAX_MAZE_X); // TODO: Make it depending on both
+    localparam LABEL_WIDTH = 5; // NOTE: This is arbitrary
     localparam LINE_WIDTH = 4;
 
     // Press indications of the controllers
@@ -48,47 +49,58 @@ module maze(
     reg rr; always @(posedge clk) rr <= r; wire pr; assign pr = !rr && r;
     reg ris_present; always @(posedge clk) ris_present <= is_present; wire pis_present; assign pis_present = !ris_present && is_present;
 
+
     reg [4:0] state;
     reg [9:0] start_maze_x;
     reg [9:0] start_maze_y;
-    reg [5:0] size_maze_x;
-    reg [5:0] size_maze_y;
+    reg [BITS_MAX_MAZE-1:0] size_maze_x;
+    reg [BITS_MAX_MAZE-1:0] size_maze_y;
+    reg [BITS_MAX_MAZE-1:0] loc_x;
+    reg [BITS_MAX_MAZE-1:0] loc_y;
+    reg [BITS_MAX_MAZE-1:0] goal_x;
+    reg [BITS_MAX_MAZE-1:0] goal_y;
     reg [9:0] size_square_x;
     reg [9:0] size_square_y;
+    reg [9:0] loc_square_x;
+    reg [9:0] loc_square_y;
+    reg [9:0] goal_square_x;
+    reg [9:0] goal_square_y;
+    reg [9:0] loc_size_x;
+    reg [9:0] loc_size_y;
 
     function [9:0] sizes_x;
-	input [5:0] in;
+	input [BITS_MAX_MAZE-1:0] in;
 	begin
         case(in)
-            5'd5: begin sizes_x = 620/5; end
-            5'd6: begin sizes_x = 620/6; end
-            5'd7: begin sizes_x = 620/7; end
-            5'd8: begin sizes_x = 620/8; end
-            5'd9: begin sizes_x = 620/9; end
-            5'd10: begin sizes_x = 620/10; end
-            5'd11: begin sizes_x = 620/11; end
-            5'd12: begin sizes_x = 620/12; end
-            5'd13: begin sizes_x = 620/13; end
-            5'd14: begin sizes_x = 620/14; end
+            'd5: begin sizes_x = 620/5; end
+            'd6: begin sizes_x = 620/6; end
+            'd7: begin sizes_x = 620/7; end
+            'd8: begin sizes_x = 620/8; end
+            'd9: begin sizes_x = 620/9; end
+            'd10: begin sizes_x = 620/10; end
+            'd11: begin sizes_x = 620/11; end
+            'd12: begin sizes_x = 620/12; end
+            'd13: begin sizes_x = 620/13; end
+            'd14: begin sizes_x = 620/14; end
             default: begin sizes_x = 620/5; end
         endcase
 	end
     endfunction
 
     function [9:0] sizes_y;
-	input [5:0] in;
+	input [BITS_MAX_MAZE-1:0] in;
 	begin
         case(in)
-            5'd5: begin sizes_y = 460/5; end
-            5'd6: begin sizes_y = 460/6; end
-            5'd7: begin sizes_y = 460/7; end
-            5'd8: begin sizes_y = 460/8; end
-            5'd9: begin sizes_y = 460/9; end
-            5'd10: begin sizes_y = 460/10; end
-            5'd11: begin sizes_y = 460/11; end
-            5'd12: begin sizes_y = 460/12; end
-            5'd13: begin sizes_y = 460/13; end
-            5'd14: begin sizes_y = 460/14; end
+            'd5: begin sizes_y = 460/5; end
+            'd6: begin sizes_y = 460/6; end
+            'd7: begin sizes_y = 460/7; end
+            'd8: begin sizes_y = 460/8; end
+            'd9: begin sizes_y = 460/9; end
+            'd10: begin sizes_y = 460/10; end
+            'd11: begin sizes_y = 460/11; end
+            'd12: begin sizes_y = 460/12; end
+            'd13: begin sizes_y = 460/13; end
+            'd14: begin sizes_y = 460/14; end
             default: begin sizes_y = 460/5; end
         endcase
 	end
@@ -150,14 +162,14 @@ module maze(
 
 
     reg [DATA_WIDTH-1:0] prev_step;
-    localparam LABEL_WIDTH = 8; // NOTE: This is arbitrary
+    reg [DATA_WIDTH-1:0] cur_step;
     reg [LABEL_WIDTH-1:0] labels_row [0:MAX_MAZE_X-1]; // The labels for this row
     reg [LABEL_WIDTH-1:0] next_label;
     wire [MAX_MAZE_X-2:0] neighboor_equal;
 
-    reg [$clog2(MAX_MAZE_X)-1:0] index;
+    reg [BITS_MAX_MAZE-1:0] index;
     reg [LABEL_WIDTH-1:0] write_label_data;
-    reg [$clog2(MAX_MAZE_X)-1:0] write_label_index;
+    reg [BITS_MAX_MAZE-1:0] write_label_index;
     reg write_label_en;
     reg [ADDR_WIDTH-1:0] addr;
 
@@ -174,7 +186,7 @@ module maze(
     end
 
     // To see the debug
-    `ifndef SYNTHESIS
+    `ifdef SIM
     wire [LABEL_WIDTH-1:0] labels_row_0 = labels_row[0];
     wire [LABEL_WIDTH-1:0] labels_row_1 = labels_row[1];
     wire [LABEL_WIDTH-1:0] labels_row_2 = labels_row[2];
@@ -201,7 +213,7 @@ module maze(
             $write("|\n");
         end
     end
-    `endif
+    `endif // SIM
 
     localparam STATE_INIT = 5'd0;
     localparam STATE_IDLE = 5'd1;
@@ -209,13 +221,17 @@ module maze(
     localparam STATE_ELLER_VSTEP = 5'd3;
     localparam STATE_ELLER_RELABEL = 5'd4;
     localparam STATE_ELLER_COMMIT = 5'd5;
+    localparam STATE_FETCH = 5'd6;
     reg force_vconn;
     reg win;
+
+    wire [9:0] gen_pos_x = start_maze_x + (size_square_x >> 2);
+    wire [9:0] gen_pos_y = start_maze_y + (size_square_y >> 2);
 
     always @(posedge clk, negedge rst_n) begin
         if(~rst_n) begin
             state <= STATE_INIT;
-            size_maze_x <= 5;
+            size_maze_x <= 10;
             size_maze_y <= 10;
             prbs_init <= 1'b1;
             we <= 1'b0;
@@ -240,15 +256,19 @@ module maze(
                         start_maze_x <= 320 - (size_square_x_d>>1);
                         start_maze_y <= 240 - (size_square_x_d>>1);
                     end
+                    goal_square_x <= 0;
+                    goal_square_y <= 0;
                 end else begin
                     if(index < size_maze_x) begin
-                        if(start_maze_x > (size_square_x>>1)) start_maze_x <= start_maze_x - (size_square_x>>1);
-                        else start_maze_x <= 0;
+                        start_maze_x <= start_maze_x - (size_square_x>>1);
+                        goal_square_x <= goal_square_x + (size_square_x);
                     end
                     if(index < size_maze_y) begin
-                        if(start_maze_y > (size_square_y>>1)) start_maze_y <= start_maze_y - (size_square_y>>1);
-                        else start_maze_y <= 0;
+                        start_maze_y <= start_maze_y - (size_square_y>>1);
+                        goal_square_y <= goal_square_y + (size_square_y);
                     end
+                    loc_size_x <= size_square_x>>1;
+                    loc_size_y <= size_square_y>>1;
                 end
                 
                 // TODO: Set start_maze_x,y
@@ -351,8 +371,38 @@ module maze(
                 we <= 1'b0;
                 idata <= {DATA_WIDTH{1'b1}};
                 if(addr == (size_maze_y-1)) begin
-                    state <= STATE_IDLE;
-                    addr <= 0;
+                    state <= STATE_FETCH;
+                    index <= 0;
+
+                    // Put the goal and the initial location
+                    case (prbs_out[1:0])
+                        2'b00:      begin loc_x <= 0; addr <= 0; loc_y <= 0; goal_x <= size_maze_x-1; goal_y <= size_maze_y-1; end
+                        2'b01:      begin loc_x <= size_maze_x-1; addr <= 0; loc_y <= 0; goal_x <= 0; goal_y <= size_maze_y-1; end
+                        2'b10:      begin loc_x <= 0; addr <= size_maze_y-1; loc_y <= size_maze_y-1; goal_x <= size_maze_x-1; goal_y <= 0; end
+                        default:    begin loc_x <= size_maze_x-1; addr <= size_maze_y-1; loc_y <= size_maze_y-1; goal_x <= 0; goal_y <= 0; end
+                    endcase
+
+                    // At this point, goal_square_x,y contans the lower right position.
+                    // We just swap according to the randomizer
+                    case (prbs_out[1:0])
+                        2'b00:      begin 
+                            loc_square_x <= gen_pos_x; loc_square_y <= gen_pos_y; 
+                            goal_square_x <= gen_pos_x+goal_square_x; goal_square_y <= gen_pos_y+goal_square_y; 
+                        end
+                        2'b01:      begin 
+                            loc_square_x <= gen_pos_x+goal_square_x; loc_square_y <= gen_pos_y; 
+                            goal_square_x <= gen_pos_x; goal_square_y <= gen_pos_y+goal_square_y; 
+                        end
+                        2'b10:      begin 
+                            loc_square_x <= gen_pos_x; loc_square_y <= gen_pos_y+goal_square_y; 
+                            goal_square_x <= gen_pos_x+goal_square_x; goal_square_y <= gen_pos_y; 
+                        end
+                        default:    begin 
+                            loc_square_x <= gen_pos_x+goal_square_x; loc_square_y <= gen_pos_y+goal_square_y; 
+                            goal_square_x <= gen_pos_x; goal_square_y <= gen_pos_y; 
+                        end
+                    endcase
+                    
                 end else begin
                     state <= STATE_ELLER_HSTEP;
                     addr <= addr + 1;
@@ -374,6 +424,38 @@ module maze(
                     if(size_maze_x > MIN_MAZE_X) size_maze_x <= size_maze_x-1;
                     state <= STATE_INIT;
                 end
+                if(pstart) begin // Just randomize
+                    state <= STATE_INIT;
+                end
+                if(pup && !win) begin
+                    if(loc_y != 0 && !prev_step[{loc_x, 1'b0}]) begin 
+                        loc_y <= loc_y - 1; loc_square_y <= loc_square_y - size_square_y; 
+                        addr <= loc_y - 1; state <= STATE_FETCH;
+                    end
+                end
+                if(pdown && !win) begin
+                    if(loc_y != (size_maze_y-1) && !cur_step[{loc_x, 1'b0}]) begin 
+                        loc_y <= loc_y + 1; loc_square_y <= loc_square_y + size_square_y; 
+                        addr <= loc_y + 1; state <= STATE_FETCH;
+                    end
+                end
+                if(pleft && !win) begin
+                    if(loc_x != 0 && !cur_step[{loc_x, 1'b0} - 1]) begin loc_x <= loc_x - 1; loc_square_x <= loc_square_x - size_square_x; end
+                end
+                if(pright && !win) begin
+                    if(loc_x != (size_maze_x-1) && !cur_step[{loc_x, 1'b0} + 1]) begin loc_x <= loc_x + 1; loc_square_x <= loc_square_x + size_square_x; end
+                end
+                if(loc_x == goal_x && loc_y == goal_y) win <= 1'b1;
+            end else if (state == STATE_FETCH) begin
+                if(loc_y != 0) addr <= loc_y-1;
+                index <= index + 1;
+                if(index == 1) cur_step <= odata;
+                if(index == 2) begin
+                    if(loc_y != 0) prev_step <= odata;
+                    else           prev_step <= {DATA_WIDTH{1'b1}};
+                    index <= 0;
+                    state <= STATE_IDLE;
+                end
             end
         end
     end
@@ -384,9 +466,9 @@ module maze(
     reg [1:0] Ga;
     reg [1:0] Ba;
     reg [ADDR_WIDTH-1:0] addra;
-    reg [$clog2(MAX_MAZE_X)-1:0] draw_square_index;
-    reg [$clog2(MAX_MAZE_X)-1:0] draw_square_y;
-    wire [$clog2(MAX_MAZE_X)-1:0] draw_square_index_1 = draw_square_index-1;
+    reg [BITS_MAX_MAZE-1:0] draw_square_index;
+    reg [BITS_MAX_MAZE-1:0] draw_square_y;
+    wire [BITS_MAX_MAZE-1:0] draw_square_index_1 = draw_square_index-1;
     reg draw;
     always @(posedge clk, negedge rst_n) begin
         if(~rst_n) begin
@@ -400,11 +482,21 @@ module maze(
             Ra <= 2'b00; Ga <= 2'b00; Ba <= 2'b00;
             if(pix_x == start_maze_x && pix_y == start_maze_y) draw <= 1'b1;
 
+            if(loc_square_x <= pix_x && pix_x < (loc_square_x+loc_size_x) &&
+               loc_square_y <= pix_y && pix_y < (loc_square_y+loc_size_y)) begin
+                Ra <= 2'b11; Ga <= 2'b00; Ba <= 2'b10;
+            end
+
+            if(goal_square_x <= pix_x && pix_x < (goal_square_x+loc_size_x) &&
+               goal_square_y <= pix_y && pix_y < (goal_square_y+loc_size_y)) begin
+                Ra <= 2'b00; Ga <= 2'b11; Ba <= 2'b00;
+            end
+
             if(bar_x <= pix_x && pix_x < (bar_x+LINE_WIDTH)) begin
                 if(draw_square_index == 0 || draw_square_index == size_maze_x) begin
                     Ra <= 2'b00; Ga <= 2'b00; Ba <= 2'b11;
                 end else if(draw_square_index > 0 && draw_square_index < size_maze_x && odata[{draw_square_index_1, 1'b0} + 1]) begin
-                    if(win) begin Ra <= 2'b00; Ga <= 2'b11; Ba <= 2'b00; end
+                    if(win) begin Ra <= 2'b00; Ga <= 2'b10; Ba <= 2'b00; end
                     else begin    Ra <= 2'b11; Ga <= 2'b00; Ba <= 2'b00; end
                 end
             end else if(pix_x == (bar_x+LINE_WIDTH)) begin
@@ -419,7 +511,7 @@ module maze(
                     draw_square_y > 0 && draw_square_y < size_maze_y && 
                     draw_square_index > 0 && draw_square_index <= (size_maze_x) && 
                     odata[{draw_square_index_1, 1'b0}]) begin
-                    if(win) begin Ra <= 2'b00; Ga <= 2'b11; Ba <= 2'b00; end
+                    if(win) begin Ra <= 2'b00; Ga <= 2'b10; Ba <= 2'b00; end
                     else begin    Ra <= 2'b11; Ga <= 2'b00; Ba <= 2'b00; end
                 end
             end else if(pix_y == (bar_y+LINE_WIDTH) && pix_x == (bar_x+LINE_WIDTH)) begin
