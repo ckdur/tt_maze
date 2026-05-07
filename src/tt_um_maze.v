@@ -60,7 +60,7 @@ module tt_um_maze (
             sys_presc    <= sys_presc + 5'b1;
         end
     end
-    wire vga_ena = sys_presc[0];
+    wire vga_ena = 1'b1;//sys_presc[0];
 
     hvsync_generator hvsync_gen(
         .clk(clk),
