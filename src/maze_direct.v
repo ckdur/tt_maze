@@ -1,45 +1,4 @@
-module double_port_ram_neigh # (
-    parameter MAX_MAZE_X = 10,
-    parameter BITS_MAX_MAZE = 4,
-    parameter LABEL_WIDTH = 5
-) (
-    input wire clk,
-    // The equal
-    output wire [MAX_MAZE_X-2:0] neighboor_equal,
-    // Write-read port
-    input wire [LABEL_WIDTH-1:0] write_label_data,
-    input wire [BITS_MAX_MAZE-1:0] write_label_index,
-    input wire write_label_en,
-    output wire [LABEL_WIDTH-1:0] write_label_odata,
-    // Read port
-    input reg [BITS_MAX_MAZE-1:0] index,
-    output reg [LABEL_WIDTH-1:0] read_label_data
-);
-    reg [LABEL_WIDTH*MAX_MAZE_X-1:0] labels_row; // The labels for this row
-    wire [LABEL_WIDTH-1:0] labels_row_q [0:MAX_MAZE_X-1];
-
-    // To evaluate if neighboor cells are the same
-    genvar i;
-    generate
-        for(i = 0; i < (MAX_MAZE_X-1); i=i+1) begin : neighboor_eval
-            assign neighboor_equal[i] = 
-                labels_row[(i+1)*LABEL_WIDTH-1:(i+0)*LABEL_WIDTH] == 
-                labels_row[(i+2)*LABEL_WIDTH-1:(i+1)*LABEL_WIDTH];
-        end
-        // Kinda like a RAM, but we need immediate access for now
-        for(i = 0; i < MAX_MAZE_X; i=i+1) begin : label_write
-            always @(posedge clk) begin
-                if(write_label_en && write_label_index == i) labels_row[(i+1)*LABEL_WIDTH-1:(i+0)*LABEL_WIDTH] <= write_label_data;
-            end
-            assign labels_row_q[i] = labels_row[(i+1)*LABEL_WIDTH-1:(i+0)*LABEL_WIDTH];
-        end
-    endgenerate
-
-    assign write_label_odata = labels_row_q[write_label_index];
-    assign read_label_data = labels_row_q[index];
-endmodule
-
-module maze(
+module maze_direct(
     input wire clk,
     input wire rst_n,
     input wire ena,
@@ -67,23 +26,12 @@ module maze(
     input wire r,
     input wire is_present
 );
-    /* Experience
-    1x1: Totally bust
-    1x2: 8 gives me util of 102% :(, 
-         7 doesn't complete detail placement, 
-         6 do not detail routing, 
-         5 lasts too long
-    2x2: 8 does it right away (42% util). 
-         10 also no problems (53% util). 
-         14 and 12 are possible if disable the DYNAMIC_SQUARES (~70% density) but too long runtime
-    */
-    //`define DYNAMIC_SQUARES
-    localparam MIN_MAZE_X = 3;
-    localparam MIN_MAZE_Y = 3;
-    localparam MAX_MAZE_X = 10; 
+    localparam MIN_MAZE_X = 5;
+    localparam MIN_MAZE_Y = 5;
+    localparam MAX_MAZE_X = 10;
     localparam MAX_MAZE_Y = 10;
-    localparam BITS_MAX_MAZE = $clog2(MAX_MAZE_X)+1; // TODO: Make it depending on both
-    localparam LABEL_WIDTH = $clog2(MAX_MAZE_X*(MAX_MAZE_X/2)); // NOTE: This is arbitrary
+    localparam BITS_MAX_MAZE = $clog2(MAX_MAZE_X); // TODO: Make it depending on both
+    localparam LABEL_WIDTH = 5; // NOTE: This is arbitrary
     localparam LINE_WIDTH = 4;
 
     // Press indications of the controllers
@@ -112,38 +60,31 @@ module maze(
     reg [BITS_MAX_MAZE-1:0] loc_y;
     reg [BITS_MAX_MAZE-1:0] goal_x;
     reg [BITS_MAX_MAZE-1:0] goal_y;
-    reg [9:0] size_square;
+    reg [9:0] size_square_x;
+    reg [9:0] size_square_y;
     reg [9:0] loc_square_x;
     reg [9:0] loc_square_y;
     reg [9:0] goal_square_x;
     reg [9:0] goal_square_y;
-    reg [9:0] loc_size;
-
-    localparam MAX_SIZE_SQUARE = 460/MAX_MAZE_Y;
-    localparam MAX_SIZE_SQUARE_2 = MAX_SIZE_SQUARE/2;
-    localparam MAX_SIZE_SQUARE_4 = MAX_SIZE_SQUARE/4;
+    reg [9:0] loc_size_x;
+    reg [9:0] loc_size_y;
 
     function [9:0] sizes_x;
 	input [BITS_MAX_MAZE-1:0] in;
 	begin
         case(in)
-        `ifdef DYNAMIC_SQUARES
-            'd3: begin sizes_x = 620/3; end
-            'd4: begin sizes_x = 620/4; end
-            'd5: begin sizes_x = 620/5; end
-            'd6: begin sizes_x = 620/6; end
-            'd7: begin sizes_x = 620/7; end
-            'd8: begin sizes_x = 620/8; end
-            'd9: begin sizes_x = 620/9; end
-            'd10: begin sizes_x = 620/10; end
-            'd11: begin sizes_x = 620/11; end
-            'd12: begin sizes_x = 620/12; end
-            'd13: begin sizes_x = 620/13; end
-            'd14: begin sizes_x = 620/14; end
-            default: begin sizes_x = 620/5; end
-        `else
-            default: begin sizes_x = MAX_SIZE_SQUARE; end
-        `endif
+            // NOTE: Commenting all of this. Helps reducing area
+            //'d5: begin sizes_x = 620/5; end
+            //'d6: begin sizes_x = 620/6; end
+            //'d7: begin sizes_x = 620/7; end
+            //'d8: begin sizes_x = 620/8; end
+            //'d9: begin sizes_x = 620/9; end
+            default: begin sizes_x = 620/10; end
+            //'d11: begin sizes_x = 620/11; end
+            //'d12: begin sizes_x = 620/12; end
+            //'d13: begin sizes_x = 620/13; end
+            //'d14: begin sizes_x = 620/14; end
+            //default: begin sizes_x = 620/5; end
         endcase
 	end
     endfunction
@@ -152,24 +93,18 @@ module maze(
 	input [BITS_MAX_MAZE-1:0] in;
 	begin
         case(in)
-        `ifdef DYNAMIC_SQUARES
             // NOTE: Commenting all of this. Helps reducing area
-            'd3: begin sizes_y = 460/3; end
-            'd4: begin sizes_y = 460/4; end
-            'd5: begin sizes_y = 460/5; end
-            'd6: begin sizes_y = 460/6; end
-            'd7: begin sizes_y = 460/7; end
-            'd8: begin sizes_y = 460/8; end
-            'd9: begin sizes_y = 460/9; end
-            'd10: begin sizes_y = 460/10; end
-            'd11: begin sizes_y = 460/11; end
-            'd12: begin sizes_y = 460/12; end
-            'd13: begin sizes_y = 460/13; end
-            'd14: begin sizes_y = 460/14; end
-            default: begin sizes_y = 460/5; end
-        `else
-            default: begin sizes_y = MAX_SIZE_SQUARE; end
-        `endif
+            //'d5: begin sizes_y = 460/5; end
+            //'d6: begin sizes_y = 460/6; end
+            //'d7: begin sizes_y = 460/7; end
+            //'d8: begin sizes_y = 460/8; end
+            //'d9: begin sizes_y = 460/9; end
+            default: begin sizes_y = 460/10; end
+            //'d11: begin sizes_y = 460/11; end
+            //'d12: begin sizes_y = 460/12; end
+            //'d13: begin sizes_y = 460/13; end
+            //'d14: begin sizes_y = 460/14; end
+            //default: begin sizes_y = 460/5; end
         endcase
 	end
     endfunction
@@ -212,11 +147,11 @@ module maze(
     localparam ADDR_WIDTH = $clog2(MAX_MAZE_Y);
     wire [ADDR_WIDTH-1:0] addrram;
     reg we;
-    wire [DATA_WIDTH-1:0] odata;
+    reg [DATA_WIDTH-1:0] odata;
     reg [DATA_WIDTH-1:0] idata;
     wire cs = 1'b1;
-    single_port_sync_ram #(
-        .DATA_WIDTH(2*MAX_MAZE_X-1), 
+    /*single_port_sync_ram #(
+        .DATA_WIDTH(DATA_WIDTH), 
         .ADDR_WIDTH(ADDR_WIDTH),
         .DEPTH(MAX_MAZE_Y))
     ram (
@@ -226,39 +161,71 @@ module maze(
         .cs(cs),
         .we(we),
         .odata(odata)
-    );
+    );*/
+    // Implementing directly to save some space in the fetchers
+    localparam DEPTH = MAX_MAZE_Y;
 
-    reg [DATA_WIDTH-1:0] prev_step;
-    reg [DATA_WIDTH-1:0] cur_step;
+    reg [DATA_WIDTH-1:0] 	tmp_data;
+    reg [DATA_WIDTH-1:0] 	mem [DEPTH];
+
+    always @ (posedge clk) begin
+        if (cs & we)
+        mem[addrram] <= idata;
+    end
+
+    always @ (posedge clk) begin
+        if (cs) begin
+            if(!we) tmp_data <= mem[addrram];
+            else    tmp_data <= idata;
+        end
+    end
+
+    assign odata = tmp_data;
+
+
+    wire step_l = loc_x == 0 ? 1'b1 : mem[loc_y][{loc_x, 1'b0} - 1];
+    wire step_r = loc_x == (size_maze_x-1) ? 1'b1 : mem[loc_y][{loc_x, 1'b0} + 1];
+    wire step_u = loc_y == 0 ? 1'b1 : mem[loc_y-1][{loc_x, 1'b0}];
+    wire step_d = loc_y == (size_maze_y-1) ? 1'b1 : mem[loc_y][{loc_x, 1'b0}]; // TODO: We can delete this mux if causes too much trouble
+    reg [LABEL_WIDTH-1:0] labels_row [0:MAX_MAZE_X-1]; // The labels for this row
     reg [LABEL_WIDTH-1:0] next_label;
+    wire [MAX_MAZE_X-2:0] neighboor_equal;
+
     reg [BITS_MAX_MAZE-1:0] index;
-    reg [ADDR_WIDTH-1:0] addr;
-
-
     reg [LABEL_WIDTH-1:0] write_label_data;
     reg [BITS_MAX_MAZE-1:0] write_label_index;
     reg write_label_en;
-    wire [MAX_MAZE_X-2:0] neighboor_equal;
-    wire [LABEL_WIDTH-1:0] read_label_data;
-    wire [LABEL_WIDTH-1:0] write_label_odata;
+    reg [ADDR_WIDTH-1:0] addr;
 
-    double_port_ram_neigh #(
-        .MAX_MAZE_X(MAX_MAZE_X), 
-        .BITS_MAX_MAZE(BITS_MAX_MAZE),
-        .LABEL_WIDTH(LABEL_WIDTH))
-    neigh (
-        .clk(clk),
-        .write_label_data(write_label_data),
-        .write_label_index(write_label_index),
-        .write_label_en(write_label_en),
-        .write_label_odata(write_label_odata),
-        .neighboor_equal(neighboor_equal),
-        .index(index),
-        .read_label_data(read_label_data)
-    );
+    // To evaluate if neighboor cells are the same
+    genvar i;
+    generate
+        for(i = 0; i < (MAX_MAZE_X-1); i=i+1) begin : neighboor_eval
+            assign neighboor_equal[i] = labels_row[i] == labels_row[i+1];
+        end
+    endgenerate
+    // Kinda like a RAM, but we need immediate access for now
+    always @(posedge clk) begin
+        if(write_label_en) labels_row[write_label_index] <= write_label_data;
+    end
 
     // To see the debug
     `ifdef SIM
+    wire [LABEL_WIDTH-1:0] labels_row_0 = labels_row[0];
+    wire [LABEL_WIDTH-1:0] labels_row_1 = labels_row[1];
+    wire [LABEL_WIDTH-1:0] labels_row_2 = labels_row[2];
+    wire [LABEL_WIDTH-1:0] labels_row_3 = labels_row[3];
+    wire [LABEL_WIDTH-1:0] labels_row_4 = labels_row[4];
+    wire [LABEL_WIDTH-1:0] labels_row_5 = labels_row[5];
+    wire [LABEL_WIDTH-1:0] labels_row_6 = labels_row[6];
+    wire [LABEL_WIDTH-1:0] labels_row_7 = labels_row[7];
+    wire [LABEL_WIDTH-1:0] labels_row_8 = labels_row[8];
+    wire [LABEL_WIDTH-1:0] labels_row_9 = labels_row[9];
+    wire [LABEL_WIDTH-1:0] labels_row_10 = labels_row[10];
+    wire [LABEL_WIDTH-1:0] labels_row_11 = labels_row[11];
+    wire [LABEL_WIDTH-1:0] labels_row_12 = labels_row[12];
+    wire [LABEL_WIDTH-1:0] labels_row_13 = labels_row[13];
+
     integer k;
     always @(posedge clk) begin
         if(we) begin
@@ -283,19 +250,14 @@ module maze(
     reg force_vconn;
     reg win;
 
-`ifdef DYNAMIC_SQUARES
-    wire [9:0] gen_pos_x = start_maze_x + (size_square >> 2);
-    wire [9:0] gen_pos_y = start_maze_y + (size_square >> 2);
-`else
-    wire [9:0] gen_pos_x = start_maze_x + MAX_SIZE_SQUARE_4;
-    wire [9:0] gen_pos_y = start_maze_y + MAX_SIZE_SQUARE_4;
-`endif
+    wire [9:0] gen_pos_x = start_maze_x + (size_square_x >> 2);
+    wire [9:0] gen_pos_y = start_maze_y + (size_square_y >> 2);
 
     always @(posedge clk, negedge rst_n) begin
         if(~rst_n) begin
             state <= STATE_INIT;
-            size_maze_x <= MAX_MAZE_X;
-            size_maze_y <= MAX_MAZE_Y;
+            size_maze_x <= 10;
+            size_maze_y <= 10;
             prbs_init <= 1'b1;
             we <= 1'b0;
             index <= 0;
@@ -304,58 +266,35 @@ module maze(
         end else begin
             if(state == STATE_INIT) begin
                 // An state to just soft-reset everything
-            `ifdef DYNAMIC_SQUARES
                 if(size_square_x_d >= size_square_y_d) begin
-                    size_square <= size_square_y_d;
-                    size_square <= size_square_y_d;
+                    size_square_x <= size_square_y_d;
+                    size_square_y <= size_square_y_d;
                 end else begin
-                    size_square <= size_square_x_d;
-                    size_square <= size_square_x_d;
+                    size_square_x <= size_square_x_d;
+                    size_square_y <= size_square_x_d;
                 end
-            `else
-                size_square <= MAX_SIZE_SQUARE;
-            `endif
                 if(index == 0) begin
-                `ifdef DYNAMIC_SQUARES
                     if(size_square_x_d >= size_square_y_d) begin
                         start_maze_x <= 320 - (size_square_y_d>>1);
-                        start_maze_y <= 240 -  (size_square_y_d>>1);
+                        start_maze_y <= 240 - (size_square_y_d>>1);
                     end else begin
                         start_maze_x <= 320 - (size_square_x_d>>1);
                         start_maze_y <= 240 - (size_square_x_d>>1);
                     end
-                `else
-                    start_maze_x <= 320 - MAX_SIZE_SQUARE_2;
-                    start_maze_y <= 240 - MAX_SIZE_SQUARE_2;
-                `endif
                     goal_square_x <= 0;
                     goal_square_y <= 0;
                 end else begin
-                `ifdef DYNAMIC_SQUARES
                     if(index < size_maze_x) begin
-                        start_maze_x <= start_maze_x - (size_square>>1);
-                        goal_square_x <= goal_square_x + (size_square);
+                        start_maze_x <= start_maze_x - (size_square_x>>1);
+                        goal_square_x <= goal_square_x + (size_square_x);
                     end
                     if(index < size_maze_y) begin
-                        start_maze_y <= start_maze_y - (size_square>>1);
-                        goal_square_y <= goal_square_y + (size_square);
+                        start_maze_y <= start_maze_y - (size_square_y>>1);
+                        goal_square_y <= goal_square_y + (size_square_y);
                     end
-                `else
-                    if(index < size_maze_x) begin
-                        start_maze_x <= start_maze_x - MAX_SIZE_SQUARE_2; // (size_square>>1);
-                        goal_square_x <= goal_square_x + MAX_SIZE_SQUARE; //(size_square);
-                    end
-                    if(index < size_maze_y) begin
-                        start_maze_y <= start_maze_y - MAX_SIZE_SQUARE_2; // (size_square>>1);
-                        goal_square_y <= goal_square_y + MAX_SIZE_SQUARE; //(size_square);
-                    end
-                `endif
+                    loc_size_x <= size_square_x>>1;
+                    loc_size_y <= size_square_y>>1;
                 end
-            `ifdef DYNAMIC_SQUARES
-                loc_size <= size_square>>1;
-            `else
-                loc_size <= MAX_SIZE_SQUARE_2;
-            `endif
                 
                 // TODO: Set start_maze_x,y
                 prbs_init <= 1'b0;
@@ -384,7 +323,7 @@ module maze(
                 end else begin
                     // Merge
                     if(!write_label_en) // If it was written before, do not change the label
-                        write_label_data <= read_label_data;
+                        write_label_data <= labels_row[index];
                     write_label_en <= 1'b1;
                     write_label_index <= index+1;
                     idata[{index, 1'b0} + 1] <= 1'b0;  // TODO: Is this synthesizable?
@@ -424,7 +363,7 @@ module maze(
                     end else begin
                         index <= index+1;
                         // is not same cell           && labels are equal
-                        if(index != write_label_index && read_label_data == write_label_odata &&
+                        if(index != write_label_index && labels_row[index] == labels_row[write_label_index] &&
                         //  already connected || is further from the judgement
                         (!idata[{index, 1'b0}] || index > write_label_index)) begin
                             // No necessary to force
@@ -457,7 +396,7 @@ module maze(
                 we <= 1'b0;
                 idata <= {DATA_WIDTH{1'b1}};
                 if(addr == (size_maze_y-1)) begin
-                    state <= STATE_FETCH;
+                    state <= STATE_IDLE;
                     index <= 0;
 
                     // Put the goal and the initial location
@@ -488,7 +427,6 @@ module maze(
                             goal_square_x <= gen_pos_x; goal_square_y <= gen_pos_y; 
                         end
                     endcase
-                    next_label <= 0;
                     
                 end else begin
                     state <= STATE_ELLER_HSTEP;
@@ -515,25 +453,25 @@ module maze(
                     state <= STATE_INIT;
                 end
                 if(pup && !win) begin
-                    if(loc_y != 0 && !prev_step[{loc_x, 1'b0}]) begin 
-                        loc_y <= loc_y - 1; loc_square_y <= loc_square_y - size_square; 
-                        addr <= loc_y - 1; state <= STATE_FETCH;
+                    if(!step_u) begin 
+                        loc_y <= loc_y - 1; loc_square_y <= loc_square_y - size_square_y; 
+                        //addr <= loc_y - 1; state <= STATE_FETCH;
                     end
                 end
                 if(pdown && !win) begin
-                    if(loc_y != (size_maze_y-1) && !cur_step[{loc_x, 1'b0}]) begin 
-                        loc_y <= loc_y + 1; loc_square_y <= loc_square_y + size_square; 
-                        addr <= loc_y + 1; state <= STATE_FETCH;
+                    if(!step_d) begin 
+                        loc_y <= loc_y + 1; loc_square_y <= loc_square_y + size_square_y; 
+                        //addr <= loc_y + 1; state <= STATE_FETCH;
                     end
                 end
                 if(pleft && !win) begin
-                    if(loc_x != 0 && !cur_step[{loc_x, 1'b0} - 1]) begin loc_x <= loc_x - 1; loc_square_x <= loc_square_x - size_square; end
+                    if(!step_l) begin loc_x <= loc_x - 1; loc_square_x <= loc_square_x - size_square_x; end
                 end
                 if(pright && !win) begin
-                    if(loc_x != (size_maze_x-1) && !cur_step[{loc_x, 1'b0} + 1]) begin loc_x <= loc_x + 1; loc_square_x <= loc_square_x + size_square; end
+                    if(!step_r) begin loc_x <= loc_x + 1; loc_square_x <= loc_square_x + size_square_x; end
                 end
                 if(loc_x == goal_x && loc_y == goal_y) win <= 1'b1;
-            end else if (state == STATE_FETCH) begin
+            /*end else if (state == STATE_FETCH) begin
                 if(loc_y != 0) addr <= loc_y-1;
                 index <= index + 1;
                 if(index == 1) cur_step <= odata;
@@ -542,7 +480,7 @@ module maze(
                     else           prev_step <= {DATA_WIDTH{1'b1}};
                     index <= 0;
                     state <= STATE_IDLE;
-                end
+                end*/
             end
         end
     end
@@ -569,13 +507,13 @@ module maze(
             Ra <= 2'b00; Ga <= 2'b00; Ba <= 2'b00;
             if(pix_x == start_maze_x && pix_y == start_maze_y) draw <= 1'b1;
 
-            if(loc_square_x <= pix_x && pix_x < (loc_square_x+loc_size) &&
-               loc_square_y <= pix_y && pix_y < (loc_square_y+loc_size)) begin
+            if(loc_square_x <= pix_x && pix_x < (loc_square_x+loc_size_x) &&
+               loc_square_y <= pix_y && pix_y < (loc_square_y+loc_size_y)) begin
                 Ra <= 2'b11; Ga <= 2'b00; Ba <= 2'b10;
             end
 
-            if(goal_square_x <= pix_x && pix_x < (goal_square_x+loc_size) &&
-               goal_square_y <= pix_y && pix_y < (goal_square_y+loc_size)) begin
+            if(goal_square_x <= pix_x && pix_x < (goal_square_x+loc_size_x) &&
+               goal_square_y <= pix_y && pix_y < (goal_square_y+loc_size_y)) begin
                 Ra <= 2'b00; Ga <= 2'b11; Ba <= 2'b00;
             end
 
@@ -587,7 +525,7 @@ module maze(
                     else begin    Ra <= 2'b11; Ga <= 2'b00; Ba <= 2'b00; end
                 end
             end else if(pix_x == (bar_x+LINE_WIDTH)) begin
-                bar_x <= bar_x + size_square;
+                bar_x <= bar_x + size_square_x;
                 if(draw_square_index != (size_maze_x+1)) draw_square_index <= draw_square_index + 1;
             end
 
@@ -602,7 +540,7 @@ module maze(
                     else begin    Ra <= 2'b11; Ga <= 2'b00; Ba <= 2'b00; end
                 end
             end else if(pix_y == (bar_y+LINE_WIDTH) && pix_x == (bar_x+LINE_WIDTH)) begin
-                bar_y <= bar_y + size_square;
+                bar_y <= bar_y + size_square_y;
                 if(draw_square_y != (size_maze_y+1)) draw_square_y <= draw_square_y + 1;
                 if(draw_square_y == size_maze_y) draw <= 1'b0;
                 addra <= draw_square_y;
