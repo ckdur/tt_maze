@@ -2,6 +2,18 @@
 
 # MAZE
 
+This is a maze generator. Made for the VGA competition of 2026/5/10.
+The repository *technically* can implement any size. For now the default is 1x1.
+
+- The 1x1 version will implement a fixed maze of 10x10. Random locations for start and goal.
+- The 1x2 version implements 3x3 up to 10x10 fixed mazes.
+- The 2x2 version does the ellier algorithm to randomize any maze from 3x3 to 10x10.
+
+If you want another size (with more features), you can:
+
+- Change the `info.yaml`
+- Change the `src/maze.v` and define/undefine `ULTRA_SMALL_1x1` in line `78`.
+
 ## Notes
 
 - To build manually, run

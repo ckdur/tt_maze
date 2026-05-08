@@ -9,12 +9,37 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-Explain how your project works
+This is a maze generator game. It puts any maze from any size up to the contraint.
+It works by executing the ellers algorithm. Quite simple generator for mazes.
+Is based on the concepts of the following article:
+https://weblog.jamisbuck.org/2010/12/29/maze-generation-eller-s-algorithm
+
+
+The full featured version includes the actual maze generator in RTL.
+Now, due to restrictions in size, this algorithm is not featured in the smaller versions.
+
+As stated in the README.md: If you want another size (with more features), you can:
+
+- Change the `info.yaml`
+- Change the `src/maze.v` and define/undefine `ULTRA_SMALL_1x1` in line `78`.
 
 ## How to test
 
-Explain how to use your project
+You can visualize it using the vga-playgrond. If you want to do it locally:
+
+```bash
+make -C test playground
+```
+
+You can run basic simulations. However, there isn't anything automated:
+
+```bash
+cd test && make -B
+gtkwave tb.fst
+```
 
 ## External hardware
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+This repository uses the following hardware:
+- PMOD Gamepad
+- PMOD VGA
