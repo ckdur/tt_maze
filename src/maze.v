@@ -68,12 +68,10 @@ module maze(
     input wire is_present
 );
     /* Experience
-    1x1: Totally bust
-    1x2: 8 gives me util of 102% :(, 
-         7 doesn't complete detail placement, 
-         6 do not detail routing, 
-         5 lasts too long
-    2x2: 8 does it right away (42% util). 
+    1x1: 75% with a fixed 10x10 maze
+    1x2: 82% with several fixed mazes from 3x3 to 10x10
+    2x2: Full-featured
+          8 does it right away (42% util). 
          10 also no problems (53% util). 
          14 and 12 are possible if disable the DYNAMIC_SQUARES (~70% density) but too long runtime
     */
