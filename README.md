@@ -49,3 +49,9 @@ python3 -m librelane --run-tag wokwi --force-run-dir runs/wokwi src/config_merge
 ```bash
 docker run --net=host -it --rm -u $UID -v /etc/passwd:/etc/passwd:ro -v $HOME:$HOME -w $HOME -e DISPLAY=$DISPLAY ghcr.io/librelane/librelane:3.0.0 bash
 ```
+
+- To visualaze locally:
+
+```bash
+make -C test playground
+```
