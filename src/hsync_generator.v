@@ -42,7 +42,7 @@ module hvsync_generator(clk, reset, ena, hsync, vsync, display_on, hpos, vpos);
   wire vmaxxed = (vpos == V_MAX) || reset;	// set when vpos is maximum
   
   // horizontal position counter
-  always @(posedge clk, posedge reset)
+  always @(posedge clk)
   begin
     if(reset) begin
         hpos <= 0;
@@ -57,7 +57,7 @@ module hvsync_generator(clk, reset, ena, hsync, vsync, display_on, hpos, vpos);
   end
 
   // vertical position counter
-  always @(posedge clk, posedge reset)
+  always @(posedge clk)
   begin
     if(reset) begin
         vpos <= 0;
