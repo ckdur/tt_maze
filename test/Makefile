@@ -28,7 +28,6 @@ VERILOG_SOURCES += $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/verilog/sky130_f
 
 # this gets copied in by the GDS action workflow
 VERILOG_SOURCES += $(abspath .)/gate_level_netlist.v
-
 endif
 
 # Allow sharing configuration between design and testbench via `include`:
@@ -55,7 +54,25 @@ $(VGA_PLAYGROUND_DIR)/src/examples/maze/index.ts: $(VGA_PLAYGROUND_DIR)/index.ht
 	mkdir -p $(VGA_PLAYGROUND_DIR)/src/examples/maze/
 	cp -r $(SRC_DIR)/* $(VGA_PLAYGROUND_DIR)/src/examples/maze/
 	cp $(SRC_DIR)/menu.ts $(VGA_PLAYGROUND_DIR)/src/examples/index.ts
+ifeq ($(GATES),yes)
+# Copy the netlist and the gates also
+	echo "\`timescale 1ns / 1ps" > $(VGA_PLAYGROUND_DIR)/src/examples/maze/tt_um_maze.nl.v
+	cat $(abspath ..)/runs/wokwi/final/nl/tt_um_maze.nl.v >> $(VGA_PLAYGROUND_DIR)/src/examples/maze/tt_um_maze.nl.v
+	cp $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/verilog/primitives.v $(VGA_PLAYGROUND_DIR)/src/examples/maze/
+	echo "" > $(VGA_PLAYGROUND_DIR)/src/examples/maze/sky130_fd_sc_hd.v
+#	echo "\`define FUNCTIONAL" > $(VGA_PLAYGROUND_DIR)/src/examples/maze/sky130_fd_sc_hd.v
+	cat $(PDK_ROOT)/sky130A/libs.ref/sky130_fd_sc_hd/verilog/sky130_fd_sc_hd.v >> $(VGA_PLAYGROUND_DIR)/src/examples/maze/sky130_fd_sc_hd.v
+	cp $(SRC_DIR)/index.postlayout.ts $(VGA_PLAYGROUND_DIR)/src/examples/maze/index.ts
+endif
 
 $(VGA_PLAYGROUND_DIR)/index.html:
 # Hackish af. Please kill me
 	cd $(abspath .) && git clone https://github.com/TinyTapeout/vga-playground.git
+
+ifeq ($(GATES),yes)
+POST_LAYOUT_SOURCE = $(abspath ..)/runs/wokwi/final/pnl/tt_um_maze.pnl.v
+
+.PHONY: $(abspath .)/gate_level_netlist.v
+$(abspath .)/gate_level_netlist.v: $(POST_LAYOUT_SOURCE)
+	cp $(POST_LAYOUT_SOURCE) $(abspath .)/gate_level_netlist.v
+endif

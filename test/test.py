@@ -25,16 +25,63 @@ async def test_project(dut):
 
     dut._log.info("Test project behavior")
 
-    # Set the input values you want to test
-    dut.ui_in.value = 20
-    dut.uio_in.value = 30
+    # Set the input values to zero
+    dut.ui_in.value = 0
+    dut.uio_in.value = 0
+    internals = False  # Enable internals to debug. Post-layout of couse doesn't work
+
+    # Just checking the VGA timings
+    # A copy of the hsync_generator parameters in python
+    # horizontal constants
+    H_DISPLAY       = 640; # horizontal display width
+    H_BACK          =  48; # horizontal left border (back porch)
+    H_FRONT         =  16; # horizontal right border (front porch)
+    H_SYNC          =  96; # horizontal sync width
+    # vertical constants
+    V_DISPLAY       = 480; # vertical display height
+    V_TOP           =  33; # vertical top border
+    V_BOTTOM        =  10; # vertical bottom border
+    V_SYNC          =   2; # vertical sync # lines
+    # derived constants
+    H_SYNC_START    = H_DISPLAY + H_FRONT;
+    H_SYNC_END      = H_DISPLAY + H_FRONT + H_SYNC - 1;
+    H_MAX           = H_DISPLAY + H_BACK + H_FRONT + H_SYNC - 1;
+    V_SYNC_START    = V_DISPLAY + V_BOTTOM;
+    V_SYNC_END      = V_DISPLAY + V_BOTTOM + V_SYNC - 1;
+    V_MAX           = V_DISPLAY + V_TOP + V_BOTTOM + V_SYNC - 1;
+    CYCLES_PER_TICK = 1  # This is if we are using a divisor or a pre-scaler
 
     # Wait for one clock cycle to see the output values
-    await ClockCycles(dut.clk, 500000)
+    heval = False
+    veval = False
+    hpos = 0
+    vpos = 0
+    latchd_hval = False
+    latchd_vval = False
+    hval = not (hpos>=H_SYNC_START and hpos<=H_SYNC_END)
+    vval = not (vpos>=V_SYNC_START and vpos<=V_SYNC_END)
+    while not heval or not veval:
+        await ClockCycles(dut.clk, CYCLES_PER_TICK)
+        
+        if internals:
+            if dut.user_project.hvsync_gen.hpos.value != hpos:
+                dut._log.info(f"WARNING: hpos do not match: {dut.user_project.hvsync_gen.hpos.value} != {hpos}")
 
-    # The following assersion is just an example of how to check the output values.
-    # Change it to match the actual expected output of your module:
-    # assert dut.uo_out.value == 50
+        assert bool(dut.uo_out.value[7]) == latchd_hval, f"XPos {hpos} not match hsync"
+        assert bool(dut.uo_out.value[3]) == latchd_vval, f"VPos {vpos} not match vsync"
 
-    # Keep testing the module by changing the input values, waiting for
-    # one or more clock cycles, and asserting the expected output values.
+        # Is registered, so should be 1 clock cycle delayed
+        latchd_hval = hval
+        latchd_vval = vval
+
+        hpos = hpos + 1
+        if hpos >= (H_MAX+1):
+            hpos = 0
+            heval = True
+            vpos = vpos + 1
+            if vpos >= (V_MAX+1):
+                vpos = 0
+                veval = True
+
+        hval = not (hpos>=H_SYNC_START and hpos<=H_SYNC_END)
+        vval = not (vpos>=V_SYNC_START and vpos<=V_SYNC_END)
