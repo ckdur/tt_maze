@@ -69,7 +69,7 @@ $(VGA_PLAYGROUND_DIR)/index.html:
 # Hackish af. Please kill me
 	cd $(abspath .) && git clone https://github.com/TinyTapeout/vga-playground.git
 
-ifeq ($(GATES),yes)
+ifeq ($(GATES_COPY),yes)
 POST_LAYOUT_SOURCE = $(abspath ..)/runs/wokwi/final/pnl/tt_um_maze.pnl.v
 
 .PHONY: $(abspath .)/gate_level_netlist.v
